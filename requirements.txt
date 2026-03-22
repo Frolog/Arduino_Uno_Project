@@ -1,0 +1,8 @@
+# Flask web server
+Flask>=2.3.2
+
+# Plotly for live graphs
+plotly>=5.17.0
+
+# Serial communication with Arduino
+pyserial>=3.6

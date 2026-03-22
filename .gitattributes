@@ -1,0 +1,4 @@
+# Ensure consistent line endings
+*.py text eol=lf
+*.ino text eol=lf
+*.md text eol=lf
