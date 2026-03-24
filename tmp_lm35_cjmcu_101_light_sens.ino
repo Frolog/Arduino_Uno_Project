@@ -17,6 +17,8 @@ const unsigned long PUMP_INTERVAL = 60000; // check every 1 min
 
 // -------- State --------
 unsigned long lastPumpTime = 0;
+float minTemp = 1000.0;  // start very high
+float maxTemp = -1000.0; // start very low
 
 // -------- Read average ADC --------
 int readAvg(int pin) {
@@ -28,11 +30,12 @@ int readAvg(int pin) {
   return sum / 10;
 }
 
-// -------- Convert LM35 --------
+// -------- Convert LM35 to °C --------
 float readTempC() {
-  int raw = readAvg(tempPin);
-  float voltage = raw * (5.0 / 1023.0);
-  return voltage / 0.01;
+  int rawTemp = analogRead(tempPin);
+  float voltage = rawTemp * (5.0 / 1023.0);
+  float tempC = voltage / 0.01; // LM35: 10 mV per °C
+  return tempC;
 }
 
 // -------- Light classification --------
@@ -61,41 +64,45 @@ void setup() {
 
 // -------- Loop --------
 void loop() {
+  // --- Read sensors ---
   float tempC = readTempC();
-  int light   = readAvg(lightPin);
-  String lightState = classifyLight(light);
+  int lightRaw = readAvg(lightPin);
+  String lightState = classifyLight(lightRaw);
+
+  // --- Update min/max ---
+  if (tempC < minTemp) minTemp = tempC;
+  if (tempC > maxTemp) maxTemp = tempC;
 
   // --- CSV output for Python ---
-  float vTemp = readAvg(tempPin) * (5.0 / 1023.0);
-  float vLight = light * (5.0 / 1023.0);
+  float tempVolt = readAvg(tempPin) * (5.0 / 1023.0);
+  float lightVolt = lightRaw * (5.0 / 1023.0);
   Serial.print(readAvg(tempPin)); Serial.print(",");   // rawTemp
-  Serial.print(vTemp, 3); Serial.print(",");          // voltage
+  Serial.print(tempVolt, 3); Serial.print(",");       // voltage
   Serial.print(tempC, 2); Serial.print(",");          // tempC
-  Serial.print(light); Serial.print(",");             // rawLight
-  Serial.println(vLight, 3);                           // vLight
+  Serial.print(lightRaw); Serial.print(",");          // rawLight
+  Serial.println(lightVolt, 3);                        // light voltage
 
-  // --- Debug line (optional, can comment out if Python stuck) ---
-  Serial.print("🌡 "); Serial.print(tempC, 2);
-  Serial.print(" °C | 💡 "); Serial.print(light);
+  // --- Debug / human-readable line ---
+  Serial.print("🌡 Current: "); Serial.print(tempC, 2);
+  Serial.print(" °C | Min: "); Serial.print(minTemp, 2);
+  Serial.print(" | Max: "); Serial.print(maxTemp, 2);
+  Serial.print(" | 💡 Light: "); Serial.print(lightRaw);
   Serial.print(" ("); Serial.print(lightState); Serial.println(")");
 
+  // --- Pump control every interval ---
   unsigned long now = millis();
-
   if (now - lastPumpTime >= PUMP_INTERVAL) {
     lastPumpTime = now;
 
     if (lightState == "Night") {
       Serial.println("🚫 Pump OFF (night)");
-    }
-    else if (lightState == "Overcast") {
+    } else if (lightState == "Overcast") {
       Serial.println("💧 Pump SHORT");
       runPump(3000);  // 3 sec
-    }
-    else if (lightState == "Cloudy") {
+    } else if (lightState == "Cloudy") {
       Serial.println("💧 Pump MEDIUM");
       runPump(6000);  // 6 sec
-    }
-    else {
+    } else {
       Serial.println("💧 Pump LONG");
       runPump(10000); // 10 sec
     }

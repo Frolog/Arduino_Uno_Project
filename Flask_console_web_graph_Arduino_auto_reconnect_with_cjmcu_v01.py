@@ -1,4 +1,16 @@
+# ---------- Project Info ----------
+PROJECT_NAME = "Environment Monitor"
+__version__ = "0.1"
+print(f"{PROJECT_NAME} version {__version__}")
+
+# Flask_console_web_graph_Arduino.py
+# Version: 0.1
+# Date: 2026-03-23
+# Changes: Initial working version with LM35 + CJMCU + light sensor
+
+
 import serial
+import random
 import time
 import threading
 import csv
@@ -9,20 +21,39 @@ from flask import Flask, jsonify, render_template_string, send_file, abort
 import logging
 
 # ---------- Configuration ----------
-COM_PORT = "COM11"      # Arduino port
+COM_PORT = "COM11"
 BAUD_RATE = 9600
-TEMP_LOW = 10.0         # Low temperature alert
-TEMP_HIGH = 30.0        # High temperature alert
-SKIP_READINGS = 5       # readings to skip after reconnect
-BUFFER_SIZE = 300       # max buffer size
+TEMP_LOW = 10.0
+TEMP_HIGH = 30.0
+SKIP_READINGS = 5
+BUFFER_SIZE = 300
+
+# ---------- Light Calibration ----------
+LIGHT_CALIB = {
+    "Night": (0, 50),
+    "Overcast": (51, 200),
+    "Cloudy": (201, 450),
+    "Sunny": (451, 850),
+    "Direct Sun": (851, 1023)
+}
+
+def classify_light(value):
+    for state, (low, high) in LIGHT_CALIB.items():
+        if low <= value <= high:
+            return state
+    return "Unknown"
 
 # ---------- Data storage ----------
 temps = []
 lights = []
+light_states = []
 times = []
 start_time = time.time()
 skip_counter = 0
 ser = None
+
+# ---------- Temp ----------
+TEMP_JITTER = 0.3  # max ±0.3°C fluctuation
 
 # ---------- CSV setup ----------
 def get_csv_filename():
@@ -49,33 +80,43 @@ def read_serial():
 
             line = ser.readline().decode(errors="ignore").strip()
             if not line:
+                time.sleep(0.05)
                 continue
 
-            # Skip first readings after reconnect
             if skip_counter > 0:
                 skip_counter -= 1
                 continue
+            
+            # ⚡ Debug print — see exactly what Python receives
+            #print("RAW:", line)
 
+            # Parse CSV 
             try:
                 # Expect CSV: rawTemp,voltage,tempC,rawLight,vLight
                 raw_t, v_t, temp, raw_l, v_l = line.split(",")
                 temp = float(temp)
+                # Add small random fluctuation ±0.3°C
+                temp += random.uniform(-TEMP_JITTER, TEMP_JITTER)
                 light = int(raw_l)
+                light_state = classify_light(light)
 
                 if 0 <= temp <= 60:
                     temps.append(temp)
                     lights.append(light)
+                    light_states.append(light_state)
                     times.append(time.time() - start_time)
 
                     # Keep buffer within size
                     if len(temps) > BUFFER_SIZE:
                         temps.pop(0)
                         lights.pop(0)
+                        light_states.pop(0)
                         times.pop(0)
 
-            except Exception:
-                # Ignore non-CSV lines or parsing errors
-                continue
+            except Exception as e:
+                # Ignore parse errors
+                # print("Parsing error:", e, "Line:", line)
+                pass
 
         except serial.SerialException:
             print("❌ Arduino disconnected – reconnecting...")
@@ -87,18 +128,18 @@ def read_serial():
             ser = None
             temps.clear()
             lights.clear()
+            light_states.clear()
             times.clear()
             skip_counter = 0
             time.sleep(2)
 
         except Exception:
+            time.sleep(0.05)
             pass
-
-        time.sleep(0.05)
 
 threading.Thread(target=read_serial, daemon=True).start()
 
-# ---------- Background: stats and CSV logging ----------
+# ---------- Background stats and CSV logging ----------
 def stats_and_logging():
     global csv_filename
     while True:
@@ -124,7 +165,6 @@ def stats_and_logging():
                     ])
         else:
             print("⏳ Waiting for Arduino data...")
-
         time.sleep(1)
 
 threading.Thread(target=stats_and_logging, daemon=True).start()
@@ -138,11 +178,14 @@ def index():
 <!DOCTYPE html>
 <html>
 <head>
+    <title>{PROJECT_NAME}</title> 
     <title>Environment Monitor</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-<h1>🌱 Environment Monitor</h1>
+<h1>🌱 {PROJECT_NAME}</h1>
+<p style="font-weight:bold; color:green;">Version: {__version__}</p>
+
 
 <h2>🌡 Temperature</h2>
 <div id="temp_alert" style="font-weight:bold; font-size:1.2em;"></div>
@@ -150,6 +193,7 @@ def index():
 
 <h2>💡 Light Level</h2>
 <div id="light_graph" style="width:100%;height:400px;"></div>
+<div id="light_state_text" style="font-size:20px;font-weight:bold;"></div>
 
 <button onclick="window.location.href='/download_csv'">📥 Download CSV</button>
 
@@ -192,9 +236,17 @@ function updatePlots() {{
                 line: {{color: "orange"}},
                 name: "Light Level"
             }}], {{
-                yaxis: {{title: "ADC", autorange: true}},
+                yaxis: {{title: "Light Level", autorange: true}},
                 xaxis: {{title: "Time (s)"}}
             }});
+
+            // Light text
+            if (d.light.length > 0) {{
+                let latestLight = d.light[d.light.length - 1];
+                let latestState = d.light_state[d.light_state.length - 1];
+                document.getElementById("light_state_text").innerText =
+                    "💡 Light: " + latestLight + " (" + latestState + ")";
+            }}
         }});
 }}
 
@@ -210,7 +262,8 @@ def data():
     return jsonify({
         "time": times,
         "temp": temps,
-        "light": lights
+        "light": lights,
+        "light_state": light_states
     })
 
 @app.route("/download_csv")

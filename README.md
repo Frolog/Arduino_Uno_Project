@@ -15,6 +15,7 @@ The system:
 * Logs **abnormal values** to CSV
 * Can be extended to control a **water pump automatically**
 
+Note: Open Only one Serial port vscode or arduino.
 ---
 
 ## 🧰 Pre-installed Tools & Applications
@@ -46,13 +47,9 @@ Install manually if needed:
 pip install pyserial flask plotly
 ```
 
----
+
 
 ## 📁 Project Structure
-
-```
-
-
 tmp_lm35_cjmcu_101_light_sens/
 │
 ├── init-arduino-project.sh   # Project initializer script
@@ -73,16 +70,52 @@ This script:
 * Sets up base structure for Arduino + Python
 * Prepares environment for development
 
-Run:
 
-```bash
-chmod +x init-arduino-project.sh
-./init-arduino-project.sh
+```
+
+Python / Flask Setup
+
+Install Python 3.14+ if not already installed.
+
+Install required packages:
+
+python -m pip install flask pyserial
+
+Run the monitoring script:
+
+python Flask_console_web_graph_Arduino_auto_reconnect_with_cjmcu_v01.py
+
+Open browser at: http://127.0.0.1:5000/
 ```
 
 ---
 
-## 🔌 Hardware Setup
+## 🔌🛠 Hardware Setup
+Component	Pin / Connection
+LM35 Temp	A0
+OPT101 Light	A1
+Pump / Relay	A3
+Power / Ground	5V / GND
+
+OPT101 connection notes:
+
+Pin 1 → 5V through 100Ω resistor
+
+100µF and 0.1µF capacitors between pin 1 and GND
+
+Pin 5 → pin 4
+
+Pin 2 → leave unconnected
+
+Arduino should send CSV lines:
+
+rawTemp,voltage,tempC,rawLight,vLight
+
+Optional human-readable lines for debugging:
+
+🌡 23.46 °C | 💡 748 (Sunny)
+
+## 🔌 Wiring
 
 ### 🧠 Arduino Uno Connections
 
@@ -137,7 +170,41 @@ Example:
 
 ---
 
-## 🖥 Python Application Features
+## 📌 Features
+
+🌡 Temperature monitoring via LM35
+
+💡 Light monitoring via OPT101
+
+📈 Live plots for temperature and light (Plotly.js in Flask)
+
+📄 CSV logging with automatic daily files
+
+💧 Pump control for irrigation:
+
+Night → OFF
+
+Overcast → short pulse
+
+Cloudy → medium pulse
+
+Sunny → long pulse
+
+Extra watering if temperature is high
+
+📝 Versioning displayed on the web page
+Script version stored in __version__
+
+Displayed on web interface (bold, colored text)
+
+Manual updates until Git/Bitbucket workflow is implemented
+
+
+🔧 Light calibration thresholds configurable
+
+🔄 Auto-reconnect to Arduino if disconnected
+
+
 
 ### 📊 Live Dashboard
 
@@ -183,36 +250,67 @@ Example:
 * Skips unstable readings after reconnect
 
 ---
+## 📷 Schematic
+![Schematic](docs/screen.png)
 
 ## ▶️ How to Run
 
 ### 1️⃣ Upload Arduino Code
-
 * Connect Arduino via USB
 * Select correct COM port
 * Upload `.ino` file
 
----
-
 ### 2️⃣ Run Python Server
+tmp_lm35_cjmcu_101_light_sens main.py
 
-```bash
-python main.py
-```
 
----
+### 3️⃣ Open Dashboard Environment Monitor:
+http://127.0.0.1:5000/
 
-### 3️⃣ Open Dashboard
 
-Go to:
+## ⚠️  Problem Solving / Notes
 
-```
-http://127.0.0.1:5000
-```
+Serial errors / Arduino disconnected
 
----
+Close Arduino Serial Monitor before running Python
 
-## ⚠️ Common Issues
+Python will auto-reconnect
+
+Parsing errors in Python
+
+Only parse CSV-formatted lines
+
+Ignore human-readable emoji lines
+
+Stable readings
+
+Use readAvg() in Arduino for LM35 and OPT101
+
+Skip first few readings after reconnect (SKIP_READINGS)
+
+Light calibration thresholds:
+
+LIGHT_CALIB = {
+    "Night": (0, 50),
+    "Overcast": (51, 200),
+    "Cloudy": (201, 450),
+    "Sunny": (451, 850),
+    "Direct Sun": (851, 1023)
+}
+
+CSV download
+
+Web page provides a download button
+
+Files auto-named: temperature_YYYY-MM-DD.csv
+
+Debugging plot issues
+
+Ensure CSV lines are sent by Arduino
+
+Print raw lines in Python:
+
+print("RAW:", line)
 
 ### ❌ COM Port Busy
 
@@ -250,10 +348,9 @@ http://127.0.0.1:5000
 
 ## 👨‍💻 Author
 
-Lior A
+Lior A.
 
 ---
 
 ## 📄 License
-
-MIT License
+none
