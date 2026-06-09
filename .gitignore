@@ -1,14 +1,21 @@
-# Arduino build files
+# PlatformIO and Arduino build files
+.pio/
 *.bin
 *.elf
 *.hex
 *.o
 *.a
 
-# temp files
+# Python Virtual Environment
+venv/
+*.pyc
+__pycache__/
+
+# Project Data and logs
+*.csv
 *.log
 *.tmp
 
-# OS
+# Operating System files
 .DS_Store
 Thumbs.db

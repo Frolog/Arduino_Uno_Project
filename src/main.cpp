@@ -1,3 +1,5 @@
+#include <Arduino.h>
+
 // -------- Pins --------
 const int tempPin  = A0;   // LM35
 const int lightPin = A1;   // OPT101
@@ -73,6 +75,7 @@ void loop() {
   Serial.print(tempC, 2); Serial.print(",");          // tempC
   Serial.print(light); Serial.print(",");             // rawLight
   Serial.println(vLight, 3);                           // vLight
+  Serial.flush();
 
   // --- Debug line (optional, can comment out if Python stuck) ---
   Serial.print("🌡 "); Serial.print(tempC, 2);

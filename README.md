@@ -195,9 +195,9 @@ Example:
 ---
 
 ### 2️⃣ Run Python Server
+chmod +x run_project.sh   
+./run_project.sh
 
-```bash
-python main.py
 ```
 
 ---

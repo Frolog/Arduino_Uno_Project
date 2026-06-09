@@ -9,7 +9,7 @@ from flask import Flask, jsonify, render_template_string, send_file, abort
 import logging
 
 # ---------- Configuration ----------
-COM_PORT = "COM11"      # Arduino port
+COM_PORT = "/dev/ttyACM0"
 BAUD_RATE = 9600
 TEMP_LOW = 10.0         # Low temperature alert
 TEMP_HIGH = 30.0        # High temperature alert
@@ -47,7 +47,9 @@ def read_serial():
                 time.sleep(2)
                 skip_counter = SKIP_READINGS
 
-            line = ser.readline().decode(errors="ignore").strip()
+            #line = ser.readline().decode(errors="ignore").strip()
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
+
             if not line:
                 continue
 

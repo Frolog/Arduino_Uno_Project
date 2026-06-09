@@ -5,4 +5,4 @@ Flask>=2.3.2
 plotly>=5.17.0
 
 # Serial communication with Arduino
-pyserial>=3.6
+pyserial>=3.5
